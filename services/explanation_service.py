@@ -48,25 +48,40 @@ def generate_alignment_explanation(
         raise RuntimeError("Gemini client not configured for explanations.")
 
     prompt = f"""
-You are analyzing the relationship between two entities (Entity A and Entity B) using ONLY the provided Wikipedia content.
+You are analyzing BRAND ALIGNMENT between two entities (Entity A and Entity B).
+
+Brand alignment means similarity in:
+- Values
+- Public persona
+- Tone and positioning
+- Audience and cultural association
+- Thematic focus (e.g. performance, innovation, luxury, family, rebellion)
+
+IMPORTANT DISTINCTIONS:
+- Brand alignment is NOT the same as endorsement, sponsorship, or collaboration.
+- Lack of partnership does NOT imply misalignment.
+- Existing endorsements with competitors should NOT reduce alignment, but may be mentioned as a separate commercial conflict note.
 
 STRICT RULES FOR ✓ (positive alignment):
-- Use ✓ ONLY if there is clear:
-  - Shared goals or values
-  - Mutual benefit or collaboration
-  - Partnership or alignment of interests
-  - Complementary roles that reinforce each other
+Use ✓ when there is clear similarity in:
+- Values or messaging
+- Public image or persona
+- Target audience or cultural positioning
+- Thematic focus or reputation
 
-STRICT RULES FOR ✗ (negative alignment or no alignment):
-- Use ✗ if there is:
-  - Conflict or adversarial history
-  - Opposing interests or values
-  - Different domains with no connection or cooperation
-  - "Historically related but opposed" → ✗
+STRICT RULES FOR ✗ (misalignment):
+Use ✗ ONLY when there is:
+- Clear contradiction in values or persona
+- Opposing brand positioning (e.g. family-friendly vs provocative)
+- Reputational incompatibility
 
-IMPORTANT: If two entities are merely related or mentioned together, but have no active positive collaboration, classify as ✗.
+DO NOT classify as ✗ merely because:
+- There is no partnership
+- They operate independently in the same industry
 
-Produce exactly 3-5 concise bullet points.
+Produce 3–5 concise bullet points:
+- Focus primarily on brand/persona similarity or mismatch
+- If relevant, include at most ONE bullet noting commercial conflict (clearly labelled)
 
 Entity A content:
 {summary_a}
@@ -74,10 +89,10 @@ Entity A content:
 Entity B content:
 {summary_b}
 
-Contextual relatedness score: {alignment_score:.2f}
-
-Return ONLY the bullets. Each line MUST start with exactly '✓' or '✗' followed by a space, then the bullet text.
+Return ONLY the bullets.
+Each line MUST start with exactly '✓' or '✗' followed by a space.
 Do not number the bullets.
+
 """
 
     response = _client.models.generate_content(model=_MODEL_NAME, contents=prompt)

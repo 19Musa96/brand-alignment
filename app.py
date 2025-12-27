@@ -82,7 +82,7 @@ if analyze:
                 # Reject nonsensical or adversarial-only comparisons
                 st.warning("⚠️ **No meaningful alignment could be established between these entities.**")
                 st.subheader("Relationship Type")
-                st.markdown("**Adversarial / Non-aligned**")
+                st.markdown("**Non-aligned**")
             else:
                 # Show normal results with framing
                 st.subheader("Relatedness Score")
@@ -94,7 +94,7 @@ if analyze:
                 negative_count = sum(1 for b in bullets if b.strip().startswith("✗"))
                 
                 if negative_count > positive_count:
-                    st.subheader("Relationship Type: Adversarial / Non-aligned")
+                    st.subheader("Relationship Type: Non-aligned")
                 elif positive_count > 0:
                     st.subheader("Alignment Assessment")
 
