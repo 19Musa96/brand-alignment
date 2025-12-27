@@ -87,7 +87,7 @@ if analyze:
                 # Show normal results with framing
                 st.subheader("Relatedness Score")
                 st.metric(label="Contextual relatedness (0-100)", value=f"{score:.2f}")
-                st.caption("ℹ️ High relatedness can indicate cooperation OR conflict. See bullets below for direction.")
+                # st.caption("ℹ️ High relatedness can indicate cooperation OR conflict. See bullets below for direction.")
                 
                 # Determine if mostly positive or mixed
                 positive_count = sum(1 for b in bullets if b.strip().startswith("✓"))
