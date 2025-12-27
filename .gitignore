@@ -1,0 +1,56 @@
+# Python caches and compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Packages and build artifacts
+*.egg
+*.egg-info/
+.eggs/
+dist/
+build/
+pip-wheel-metadata/
+*.whl
+
+# Testing and coverage
+.coverage
+.coverage.*
+.pytest_cache/
+.nox/
+.tox/
+
+# Type checking
+.mypy_cache/
+.pytype/
+
+# Logs and local caches
+*.log
+logs/
+.cache/
+
+# Environment files (secrets)
+.env
+.env.local
+.env.*.local
+
+# Editor/IDE settings
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS-specific
+.DS_Store
+Thumbs.db
+ehthumbs.db
+desktop.ini
+
+# Notebooks and Streamlit
+.ipynb_checkpoints/
+.streamlit/
