@@ -12,7 +12,7 @@ from typing import Optional
 from google import genai
 import numpy as np
 
-_MODEL_NAME = "text-embedding-004"
+_MODEL_NAME = "gemini-embedding-001"
 _configured: bool = False
 _client: Optional[genai.Client] = None
 
