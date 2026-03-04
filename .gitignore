@@ -54,3 +54,6 @@ desktop.ini
 # Notebooks and Streamlit
 .ipynb_checkpoints/
 .streamlit/
+
+#scripts for deploying to gcloud run
+*.sh
