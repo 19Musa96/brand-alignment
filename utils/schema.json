@@ -1,0 +1,13 @@
+{
+  "schema_version": "1.0",
+  "entity_type": "person | company | organization | brand",
+  "primary_domain": "",
+  "sub_domains": [],
+  "economic_model": "",
+  "core_mission": "",
+  "value_signals": [],
+  "cultural_positioning": "",
+  "target_audience": "",
+  "power_positioning": "",
+  "controversy_themes": []
+}

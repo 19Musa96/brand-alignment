@@ -1,7 +1,7 @@
 import streamlit as st
 from dotenv import load_dotenv
 
-from services.embedding_service import compute_alignment_score
+from services.embedding_service import compute_final_alignment_score
 from services.explanation_service import generate_alignment_explanation
 from services.wikipedia_service import get_entity_text
 
@@ -59,10 +59,10 @@ if analyze:
             text_b = entity_b_data["text"]
 
             with st.spinner("Computing contextual relatedness..."):
-                score = compute_alignment_score(text_a, text_b)
+                domain_score, value_score,domain_score_dict,value_score_dict = compute_final_alignment_score(text_a, text_b)
 
             with st.spinner("Determining alignment direction..."):
-                bullets = generate_alignment_explanation(text_a, text_b, score)
+                bullets = generate_alignment_explanation(text_a, text_b)
 
             # Show images after successful resolution
             if entity_a_data.get("image_url"):
@@ -78,25 +78,27 @@ if analyze:
             # Check if all bullets are negative (✗)
             all_negative = all(bullet.strip().startswith("✗") for bullet in bullets)
             
-            if all_negative:
-                # Reject nonsensical or adversarial-only comparisons
-                st.warning("⚠️ **No meaningful alignment could be established between these entities.**")
-                st.subheader("Relationship Type")
-                st.markdown("**Non-aligned**")
-            else:
-                # Show normal results with framing
-                st.subheader("Relatedness Score")
-                st.metric(label="Contextual relatedness (0-100)", value=f"{score:.2f}")
-                # st.caption("ℹ️ High relatedness can indicate cooperation OR conflict. See bullets below for direction.")
-                
-                # Determine if mostly positive or mixed
-                positive_count = sum(1 for b in bullets if b.strip().startswith("✓"))
-                negative_count = sum(1 for b in bullets if b.strip().startswith("✗"))
-                
-                if negative_count > positive_count:
-                    st.subheader("Relationship Type: Non-aligned")
-                elif positive_count > 0:
-                    st.subheader("Alignment Assessment")
+            # if all_negative:
+            #     # Reject nonsensical or adversarial-only comparisons
+            #     st.warning("⚠️ **No meaningful alignment could be established between these entities.**")
+            #     st.subheader("Relationship Type")
+            #     st.markdown("**Non-aligned**")
+            # else:
+            # Show normal results with framing
+            st.subheader("Domain Relatedness")
+            st.metric(label="Score (0-100)", value=f"{domain_score:.2f}",help=str(domain_score_dict))
+            # st.caption("ℹ️ High relatedness can indicate cooperation OR conflict. See bullets below for direction.")
+            st.subheader("Value Alignment")
+            st.metric(label="Score(0-100)", value=f"{value_score:.2f}",help=str(value_score_dict))
+
+            # Determine if mostly positive or mixed
+            positive_count = sum(1 for b in bullets if b.strip().startswith("✓"))
+            negative_count = sum(1 for b in bullets if b.strip().startswith("✗"))
+            
+            if negative_count > positive_count:
+                st.subheader("Relationship Type: Non-aligned")
+            elif positive_count > 0:
+                st.subheader("Alignment Assessment")
 
             # Always show bullets
             for bullet in bullets:

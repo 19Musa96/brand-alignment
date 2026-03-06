@@ -25,7 +25,7 @@ def _configure_client() -> None:
 
 
 def generate_alignment_explanation(
-    summary_a: str, summary_b: str, alignment_score: float
+    summary_a: str, summary_b: str
 ) -> List[str]:
     """
     Produce 3-5 factual bullet points explaining alignment direction.
@@ -81,7 +81,7 @@ DO NOT classify as ✗ merely because:
 
 Produce 3–5 concise bullet points:
 - Focus primarily on brand/persona similarity or mismatch
-- If relevant, include at most ONE bullet noting commercial conflict (clearly labelled)
+- If relevant, include at most ONE bullet noting commercial conflict (clearly labelled) and use ✗ 
 
 Entity A content:
 {summary_a}

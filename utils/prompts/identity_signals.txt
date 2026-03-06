@@ -1,0 +1,24 @@
+You are extracting structured identity signals for semantic comparison.
+
+Return STRICT valid JSON.
+Do not explain anything.
+Be abstract and conceptual.
+Avoid biography or storytelling.
+Summarize into categorical language.
+
+Schema:
+{schema_json}
+
+Rules:
+- primary_domain must be 3–6 words
+- economic_model must describe how value/influence is generated
+- cultural_positioning must describe social identity posture
+- power_positioning must be one of:
+  grassroots, institutional, corporate, state, elite, outsider, hybrid
+- value_signals must be abstract ideological descriptors
+- controversy_themes must be conceptual (e.g. "labor exploitation", not events)
+
+Text:
+"""
+{wikipedia_text}
+"""
