@@ -180,21 +180,8 @@ def compute_final_alignment_score(text_a: str, text_b: str) -> float:
         config=VALUE_ALIGNMENT_CONFIG
     )
     
-    return domain_score, value_score,domain_score_dict,value_score_dict
+    return domain_score, value_score,domain_score_dict,value_score_dict,entity_a,entity_b
 
 def parse_response(text):
     response = text.replace("```json", "").replace("```", "").strip()
     return response
-
-def relationship_label(domain, alignment):
-
-    if domain > 70 and alignment > 70:
-        return "Strong Strategic Alignment"
-
-    if domain > 70 and alignment < 40:
-        return "Competitive or Adversarial Relationship"
-
-    if domain < 40 and alignment > 70:
-        return "Shared Values but Different Domains"
-
-    return "Low Strategic Connection"

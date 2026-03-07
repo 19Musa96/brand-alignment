@@ -1,9 +1,11 @@
 import streamlit as st
 from dotenv import load_dotenv
 
-from services.embedding_service import compute_final_alignment_score,relationship_label
+from services.embedding_service import compute_final_alignment_score
 from services.explanation_service import generate_alignment_explanation
 from services.wikipedia_service import get_entity_text
+from utils.scoring_utils import relationship_label
+from utils.ui_utils import render_identity_profile
 
 EXPLANATION_FILE_NAME = './utils/explanation.txt'
 
@@ -38,9 +40,11 @@ with st.form("alignment_form", clear_on_submit=False):
     with col1:
         entity_a = st.text_input("Entity A (celebrity/public figure)")
         image_slot_a = st.empty()
+        expander_slot_a = st.empty()
     with col2:
         entity_b = st.text_input("Entity B (brand/public figure)")
         image_slot_b = st.empty()
+        expander_slot_b = st.empty()
 
     analyze = st.form_submit_button("Analyze Alignment")
 
@@ -63,7 +67,7 @@ if analyze:
             text_b = entity_b_data["text"]
 
             with st.spinner("Computing contextual relatedness..."):
-                domain_score, value_score,domain_score_dict,value_score_dict = compute_final_alignment_score(text_a, text_b)
+                domain_score, value_score,domain_score_dict,value_score_dict,identity_a,identity_b = compute_final_alignment_score(text_a, text_b)
 
             with st.spinner("Determining alignment direction..."):
                 bullets = generate_alignment_explanation(text_a, text_b)
@@ -78,6 +82,9 @@ if analyze:
                 image_slot_b.image(entity_b_data["image_url"], use_container_width=True)
             else:
                 image_slot_b.caption("No Wikipedia image available")
+
+            render_identity_profile(entity_a,identity_a,expander_slot_a)
+            render_identity_profile(entity_b,identity_b,expander_slot_b)
 
             # Check if all bullets are negative (✗)
             all_negative = all(bullet.strip().startswith("✗") for bullet in bullets)
