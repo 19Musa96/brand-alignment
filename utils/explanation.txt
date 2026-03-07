@@ -1,0 +1,94 @@
+### Overview
+
+This tool evaluates the relationship between two entities (people, companies, organizations, or brands) using semantic analysis of publicly available information.
+
+We extract structured identity signals from Wikipedia and other sources and compare them across two dimensions:
+
+• **Domain Relatedness**  
+• **Value Alignment**
+
+Each dimension is calculated by comparing multiple semantic axes using embeddings and weighted similarity scoring.
+
+---
+
+### Domain Relatedness
+
+This measures whether two entities operate within the same ecosystem or market space.
+
+The following axes contribute to the score:
+
+**Primary Domain**  
+The main industry or field in which the entity operates.  
+Examples: football, automotive manufacturing, climate activism.
+
+**Sub-domains**  
+More specific operational areas within the broader domain.
+
+**Economic Model**  
+How the entity creates value or generates revenue.  
+Examples: product sales, sponsorships, advertising, activism, services.
+
+**Target Audience**  
+The demographic groups the entity primarily engages with.
+
+High domain relatedness typically indicates the entities participate in the same industry or cultural sphere.
+
+---
+
+### Value Alignment
+
+This measures whether two entities share similar missions, beliefs, or cultural identities.
+
+The following axes contribute to the score:
+
+**Core Mission**  
+The primary goals or objectives associated with the entity.
+
+**Value Signals**  
+Themes associated with the entity’s public messaging or reputation.
+
+**Cultural Positioning**  
+How the entity positions itself culturally.  
+Examples: elite performance, grassroots activism, luxury, innovation.
+
+**Power Positioning**  
+Whether the entity represents institutional authority, disruption, advocacy, etc.
+
+**Controversy Themes**  
+Recurring public criticisms or controversies connected to the entity.
+
+Value alignment reflects philosophical compatibility, not simply industry overlap.
+
+---
+
+### Scoring Approach
+
+For each axis:
+
+1. Text representations are converted into semantic embeddings
+2. Similarity between entities is computed
+3. Scores are weighted and aggregated across axes
+4. Missing axes are ignored and weights are re-normalized
+
+This produces two independent scores:
+
+• **Domain Relatedness Score**  
+• **Value Alignment Score**
+
+These scores help identify potential brand partnerships, conflicts, or reputational risks.
+
+---
+
+### Interpretation
+
+High relatedness + high alignment  
+→ strong partnership potential
+
+High relatedness + low alignment  
+→ competitive or adversarial relationship
+
+Low relatedness + high alignment  
+→ shared values but different industries
+
+Low relatedness + low alignment  
+→ unrelated entities

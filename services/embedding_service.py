@@ -113,7 +113,7 @@ def extract_identity_signals(text: str) -> dict:
     identity_signal_prompt = IDENTITY_SIGNAL_TEMPLATE.format(wikipedia_text=truncated_text,
                                                            schema_json=JSON_SCHEMA)
     
-    model_name = load_model("gemini-2.5-flash")
+    model_name = load_model("gemini-2.5-flash-lite")
 
     response = _client.models.generate_content(model=model_name, contents=identity_signal_prompt)
     identity_signal_str = getattr(response, "text", None) or ""
@@ -185,3 +185,16 @@ def compute_final_alignment_score(text_a: str, text_b: str) -> float:
 def parse_response(text):
     response = text.replace("```json", "").replace("```", "").strip()
     return response
+
+def relationship_label(domain, alignment):
+
+    if domain > 70 and alignment > 70:
+        return "Strong Strategic Alignment"
+
+    if domain > 70 and alignment < 40:
+        return "Competitive or Adversarial Relationship"
+
+    if domain < 40 and alignment > 70:
+        return "Shared Values but Different Domains"
+
+    return "Low Strategic Connection"

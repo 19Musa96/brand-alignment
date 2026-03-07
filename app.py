@@ -1,10 +1,14 @@
 import streamlit as st
 from dotenv import load_dotenv
 
-from services.embedding_service import compute_final_alignment_score
+from services.embedding_service import compute_final_alignment_score,relationship_label
 from services.explanation_service import generate_alignment_explanation
 from services.wikipedia_service import get_entity_text
 
+EXPLANATION_FILE_NAME = './utils/explanation.txt'
+
+with open(EXPLANATION_FILE_NAME,'rt') as file:
+    EXPLANATION_TEXT = file.read()
 
 st.set_page_config(
     page_title="Celebrity–Brand Alignment AI (PoC)",
@@ -77,19 +81,20 @@ if analyze:
 
             # Check if all bullets are negative (✗)
             all_negative = all(bullet.strip().startswith("✗") for bullet in bullets)
+
+            label = relationship_label(domain_score, value_score)
+
+            st.success(f"Relationship Classification: **{label}**")
             
-            # if all_negative:
-            #     # Reject nonsensical or adversarial-only comparisons
-            #     st.warning("⚠️ **No meaningful alignment could be established between these entities.**")
-            #     st.subheader("Relationship Type")
-            #     st.markdown("**Non-aligned**")
-            # else:
             # Show normal results with framing
             st.subheader("Domain Relatedness")
-            st.metric(label="Score (0-100)", value=f"{domain_score:.2f}",help=str(domain_score_dict))
+            st.metric(label="(0-100)",value=f"{domain_score:.2f}",help=str(domain_score_dict))
+            st.progress(domain_score / 100)
             # st.caption("ℹ️ High relatedness can indicate cooperation OR conflict. See bullets below for direction.")
             st.subheader("Value Alignment")
-            st.metric(label="Score(0-100)", value=f"{value_score:.2f}",help=str(value_score_dict))
+            st.metric(label="(0-100)",value=f"{value_score:.2f}",help=str(value_score_dict))
+            st.progress(value_score / 100)
+
 
             # Determine if mostly positive or mixed
             positive_count = sum(1 for b in bullets if b.strip().startswith("✓"))
@@ -106,5 +111,11 @@ if analyze:
 
         except Exception as exc:  # noqa: BLE001
             st.error(f"Unable to complete alignment: {exc}")
+
+st.subheader("How the Scores Work")
+
+with st.expander("ⓘ Methodology and Scoring Explanation"):
+
+    st.markdown(EXPLANATION_TEXT)
 
 st.caption("Data source: Wikipedia REST API. Embeddings and explanation via Gemini. This is a PoC, not production.")

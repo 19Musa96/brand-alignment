@@ -5,7 +5,7 @@ from typing import List
 
 from google import genai
 
-_MODEL_NAME = "gemini-3-flash-preview"
+_MODEL_NAME = "gemini-2.5-flash-lite"
 _configured: bool = False
 _client: genai.Client | None = None
 
