@@ -12,6 +12,10 @@ import json
 
 from google import genai
 import numpy as np
+from gensim.matutils import unitvec
+
+from scipy.spatial import distance
+from sentence_transformers import SentenceTransformer
 
 _configured: bool = False
 _client: Optional[genai.Client] = None
@@ -84,23 +88,42 @@ def compute_alignment_score(text_a: str, text_b: str) -> float:
     emb_a = _embed_text(text_a.strip())
     emb_b = _embed_text(text_b.strip())
 
-    norm_a = np.linalg.norm(emb_a)
-    norm_b = np.linalg.norm(emb_b)
-    if norm_a == 0 or norm_b == 0:
-        raise ValueError(
-            "Embedding norm is zero; cannot compute cosine similarity.")
+    return cosine_similarity_gensim(emb_a, emb_b) * 100.0
 
-    cosine_sim = float(np.dot(emb_a, emb_b) / (norm_a * norm_b))
-    if cosine_sim < 0:
-        normalized = ((cosine_sim + 1.0) / 2.0) * 100.0
-    else:
-        normalized = cosine_sim*100.0
+    # norm_a = np.linalg.norm(emb_a)
+    # norm_b = np.linalg.norm(emb_b)
+    # if norm_a == 0 or norm_b == 0:
+    #     raise ValueError(
+    #         "Embedding norm is zero; cannot compute cosine similarity.")
 
-    if normalized < 0:
-        normalized = 0.0
-    if normalized > 100:
-        normalized = 100.0
-    return normalized
+    # cosine_sim = float(np.dot(emb_a, emb_b) / (norm_a * norm_b))
+    
+    # normalized = ((cosine_sim + 1.0) / 2.0) * 100.0
+
+    # if normalized < 0:
+    #     normalized = 0.0
+    # if normalized > 100:
+    #     normalized = 100.0
+    # return normalized
+
+def cosine_similarity_gensim(vec_a: np.ndarray, vec_b: np.ndarray) -> float:
+    """
+    Compute cosine similarity using Gensim vector normalization.
+    """
+
+    vec_a = unitvec(vec_a)
+    vec_b = unitvec(vec_b)
+
+    return float(np.dot(vec_a, vec_b))
+
+def compute_similarity(text_a: str, text_b: str,model:SentenceTransformer) -> float:
+    """
+    Compute cosine similarity between two texts and return in [0, 100].
+    """
+    vec_a = model.encode(text_a)
+    vec_b = model.encode(text_b)
+    # print(vec_a,vec_a.shape)
+    return float(distance.cosine(vec_a, vec_b)) * 100.0
 
 def extract_identity_signals(text: str) -> dict:
     """
@@ -125,7 +148,7 @@ def extract_identity_signals(text: str) -> dict:
 
     return identity_signal_json
 
-def compute_entity_relatedness(entity_a: dict, entity_b: dict, config: dict) -> float:
+def compute_entity_relatedness(entity_a: dict, entity_b: dict, model: SentenceTransformer, config: dict) -> float:
     """
     Compute a weightedscore between two entities based on the config (0-100).
     
@@ -144,11 +167,14 @@ def compute_entity_relatedness(entity_a: dict, entity_b: dict, config: dict) -> 
         entity_a_value = ",".join(entity_a_value) if isinstance(entity_a_value, list) else entity_a_value
         entity_b_value = ",".join(entity_b_value) if isinstance(entity_b_value, list) else entity_b_value
 
-        print(f"Entity A value for {k}: {entity_a_value}")
-        print(f"Entity B value for {k}: {entity_b_value}")
+        entity_a_value = f"{k}: {entity_a_value}"
+        entity_b_value = f"{k}: {entity_b_value}"
+
+        print(f"Entity A: {entity_a_value}")
+        print(f"Entity B: {entity_b_value}")
 
         if not entity_a_value == "" and not entity_b_value == "":
-            score = compute_alignment_score(entity_a_value, entity_b_value)
+            score = compute_similarity(entity_a_value, entity_b_value,model)
             alignment_scores_tuples[k] = (weight,score)
             alignment_scores[k] = score
         
@@ -161,7 +187,7 @@ def compute_entity_relatedness(entity_a: dict, entity_b: dict, config: dict) -> 
 
     return weighted_score,alignment_scores
 
-def compute_final_alignment_score(text_a: str, text_b: str) -> float:
+def compute_final_alignment_score(text_a: str, text_b: str,model:SentenceTransformer) -> float:
     """
     Compute a final alignment score by combining domain and value scores with weights.
     """
@@ -171,12 +197,14 @@ def compute_final_alignment_score(text_a: str, text_b: str) -> float:
     domain_score,domain_score_dict = compute_entity_relatedness(
         entity_a=entity_a,
         entity_b=entity_b,
+        model=model,
         config=DOMAIN_RELATEDNESS_CONFIG
     )
 
     value_score,value_score_dict = compute_entity_relatedness(
         entity_a=entity_a,
         entity_b=entity_b,
+        model=model,
         config=VALUE_ALIGNMENT_CONFIG
     )
     

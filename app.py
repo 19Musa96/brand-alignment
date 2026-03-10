@@ -6,6 +6,9 @@ from services.explanation_service import generate_alignment_explanation
 from services.wikipedia_service import get_entity_text
 from utils.scoring_utils import relationship_label
 from utils.ui_utils import render_identity_profile
+from sentence_transformers import SentenceTransformer
+
+model = SentenceTransformer('all-MiniLM-L6-v2')
 
 EXPLANATION_FILE_NAME = './utils/explanation.txt'
 
@@ -67,7 +70,7 @@ if analyze:
             text_b = entity_b_data["text"]
 
             with st.spinner("Computing contextual relatedness..."):
-                domain_score, value_score,domain_score_dict,value_score_dict,identity_a,identity_b = compute_final_alignment_score(text_a, text_b)
+                domain_score, value_score,domain_score_dict,value_score_dict,identity_a,identity_b = compute_final_alignment_score(text_a, text_b,model)
 
             with st.spinner("Determining alignment direction..."):
                 bullets = generate_alignment_explanation(text_a, text_b)
