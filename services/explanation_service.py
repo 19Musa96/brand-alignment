@@ -5,6 +5,8 @@ from typing import List
 
 from google import genai
 
+from services.retry import gemini_retry
+
 _MODEL_NAME = "gemini-2.5-flash-lite"
 _configured: bool = False
 _client: genai.Client | None = None
@@ -24,6 +26,7 @@ def _configure_client() -> None:
     _configured = True
 
 
+@gemini_retry
 def generate_alignment_explanation(
     summary_a: str, summary_b: str
 ) -> List[str]:

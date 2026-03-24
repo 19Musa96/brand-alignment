@@ -1,7 +1,27 @@
 {
-    "core_mission": 0.30,
-    "value_signals": 0.25,
-    "cultural_positioning": 0.20,
-    "power_positioning": 0.15,
-    "controversy_themes": 0.10
+    "weights": {
+        "core_mission": 0.30,
+        "value_signals": 0.25,
+        "cultural_positioning": 0.20,
+        "power_positioning": 0.15,
+        "controversy_themes": 0.10
+    },
+    "normalization": {
+        "method": "sigmoid",
+        "midpoint": 50.0,
+        "steepness": 0.1
+    },
+    "llm_judge": {
+        "default_weight": 0.3,
+        "axis_weights": {
+            "core_mission": 0.35,
+            "value_signals": 0.30,
+            "cultural_positioning": 0.30,
+            "power_positioning": 0.25,
+            "controversy_themes": 0.20
+        }
+    },
+    "baseline": {
+        "enabled": true
+    }
 }

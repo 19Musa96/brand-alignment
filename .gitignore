@@ -33,6 +33,7 @@ pip-wheel-metadata/
 *.log
 logs/
 .cache/
+utils/baseline_cache.json
 
 # Environment files (secrets)
 .env
@@ -57,3 +58,7 @@ desktop.ini
 
 #scripts for deploying to gcloud run
 *.sh
+
+.automaker
+node_modules
+test-results

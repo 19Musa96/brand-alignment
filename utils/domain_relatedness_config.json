@@ -1,6 +1,25 @@
 {
-    "primary_domain": 0.40,
-    "sub_domains": 0.20,
-    "economic_model": 0.25,
-    "target_audience": 0.15
+    "weights": {
+        "primary_domain": 0.40,
+        "sub_domains": 0.20,
+        "economic_model": 0.25,
+        "target_audience": 0.15
+    },
+    "normalization": {
+        "method": "sigmoid",
+        "midpoint": 50.0,
+        "steepness": 0.1
+    },
+    "llm_judge": {
+        "default_weight": 0.3,
+        "axis_weights": {
+            "primary_domain": 0.3,
+            "sub_domains": 0.25,
+            "economic_model": 0.35,
+            "target_audience": 0.3
+        }
+    },
+    "baseline": {
+        "enabled": true
+    }
 }
