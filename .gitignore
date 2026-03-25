@@ -35,6 +35,11 @@ logs/
 .cache/
 utils/baseline_cache.json
 
+# Pre-computed entity database (large, rebuilt offline)
+data/entities.db
+data/entities.db-wal
+data/entities.db-shm
+
 # Environment files (secrets)
 .env
 .env.local
