@@ -1,13 +1,87 @@
 """Wikipedia data access for the PoC using the official REST API only."""
 
 import os
+import re
 import urllib.parse
-from typing import Dict, Optional, List, Any
+from concurrent.futures import ThreadPoolExecutor
+from typing import Dict, Optional, List, Any, Tuple
 
 import requests
 
 WIKIPEDIA_SUMMARY_URL = "https://en.wikipedia.org/api/rest_v1/page/summary/{title}"
 WIKIPEDIA_SEARCH_URL = "https://en.wikipedia.org/w/api.php"
+
+# Reuse a single session for connection pooling (HTTP keep-alive)
+_session = requests.Session()
+
+
+class DisambiguationError(Exception):
+    """Raised when a Wikipedia lookup resolves to a disambiguation page.
+
+    Attributes:
+        entity_name: The original entity name the user entered.
+        candidates: List of (title, description) tuples parsed from the page.
+    """
+
+    def __init__(self, entity_name: str, candidates: List[Tuple[str, str]]):
+        self.entity_name = entity_name
+        self.candidates = candidates
+        titles = [t for t, _ in candidates[:5]]
+        super().__init__(
+            f"'{entity_name}' is ambiguous. Did you mean: {', '.join(titles)}?"
+        )
+
+
+def _parse_disambiguation_candidates(title: str) -> List[Tuple[str, str]]:
+    """Fetch a disambiguation page and return candidate (title, description) pairs.
+
+    Uses the Action API to get the page HTML, then extracts internal links
+    from list items which is the standard disambiguation page format.
+    """
+    params = {
+        "action": "parse",
+        "page": title,
+        "prop": "links|text",
+        "format": "json",
+        "redirects": 1,
+    }
+    resp = _session.get(
+        WIKIPEDIA_SEARCH_URL,
+        params=params,
+        headers=_build_headers(),
+        timeout=10,
+    )
+    resp.raise_for_status()
+    data = resp.json()
+
+    parse_data = data.get("parse", {})
+    page_text = parse_data.get("text", {}).get("*", "")
+
+    # Extract list items: disambiguation pages use <li> with <a> links
+    candidates: List[Tuple[str, str]] = []
+    # Match <li> blocks containing at least one internal wiki link
+    li_pattern = re.compile(r"<li>(.*?)</li>", re.DOTALL)
+    link_pattern = re.compile(r'<a[^>]+href="/wiki/([^"#]+)"[^>]*>([^<]+)</a>')
+
+    for li_match in li_pattern.finditer(page_text):
+        li_html = li_match.group(1)
+        links = link_pattern.findall(li_html)
+        if not links:
+            continue
+        # First link in the <li> is the candidate article
+        raw_title, display_text = links[0]
+        candidate_title = urllib.parse.unquote(raw_title).replace("_", " ")
+        # Skip meta/help links
+        if candidate_title.startswith(("Wikipedia:", "Help:", "Category:", "Template:", "Special:")):
+            continue
+        # Build description from remaining text (strip HTML tags)
+        description = re.sub(r"<[^>]+>", "", li_html).strip()
+        # Truncate long descriptions
+        if len(description) > 150:
+            description = description[:147] + "..."
+        candidates.append((candidate_title, description))
+
+    return candidates
 
 
 def _build_headers() -> Dict[str, str]:
@@ -206,7 +280,7 @@ def _search_wikipedia_with_type(
             "format": "json",
             "srlimit": 10,  # Increased to find better matches
         }
-        response = requests.get(
+        response = _session.get(
             WIKIPEDIA_SEARCH_URL,
             params=params,
             headers=_build_headers(),
@@ -341,7 +415,7 @@ def _fetch_best_image(title: str, is_brand: bool, is_public_figure: bool, summar
         "pilicense": "any",
     }
     try:
-        resp = requests.get(
+        resp = _session.get(
             WIKIPEDIA_SEARCH_URL,
             params=params,
             headers=_build_headers(),
@@ -376,7 +450,7 @@ def _fetch_article_sections(title: str) -> str:
         "format": "json",
         "exintro": False,  # allow body content
     }
-    response = requests.get(
+    response = _session.get(
         WIKIPEDIA_SEARCH_URL,
         params=params,
         headers=_build_headers(),
@@ -395,7 +469,7 @@ def _fetch_article_sections(title: str) -> str:
         # Fallback to REST summary
         encoded_title = urllib.parse.quote(title)
         url = WIKIPEDIA_SUMMARY_URL.format(title=encoded_title)
-        resp_summary = requests.get(url, headers=_build_headers(), timeout=10)
+        resp_summary = _session.get(url, headers=_build_headers(), timeout=10)
         if resp_summary.status_code == 200:
             extract = resp_summary.json().get("extract", "")
     if not extract:
@@ -440,7 +514,7 @@ def get_entity_text(entity_name: str, expected_type: Optional[str] = None) -> Di
     # Try direct lookup first
     encoded_title = urllib.parse.quote(title)
     url = WIKIPEDIA_SUMMARY_URL.format(title=encoded_title)
-    response = requests.get(url, headers=_build_headers(), timeout=10)
+    response = _session.get(url, headers=_build_headers(), timeout=10)
 
     direct_lookup_failed = False
     if response.status_code != 200:
@@ -448,7 +522,13 @@ def get_entity_text(entity_name: str, expected_type: Optional[str] = None) -> Di
     else:
         data = response.json()
         page_type = data.get("type")
-        if page_type in {"disambiguation", "missing"}:
+        if page_type == "disambiguation":
+            candidates = _parse_disambiguation_candidates(title)
+            if candidates:
+                raise DisambiguationError(entity_name, candidates)
+            # If parsing returned nothing, fall back to search
+            direct_lookup_failed = True
+        elif page_type == "missing":
             direct_lookup_failed = True
         else:
             # Validate that direct result matches expected_type
@@ -483,15 +563,57 @@ def get_entity_text(entity_name: str, expected_type: Optional[str] = None) -> Di
         # Fetch summary for resolved title
         encoded_title = urllib.parse.quote(title)
         url = WIKIPEDIA_SUMMARY_URL.format(title=encoded_title)
-        resp_summary = requests.get(url, headers=_build_headers(), timeout=10)
+        resp_summary = _session.get(url, headers=_build_headers(), timeout=10)
         if resp_summary.status_code == 200:
             summary_data = resp_summary.json()
 
-    # Fetch lead + key sections text
-    extract = _fetch_article_sections(title)
-
+    # Fetch article text and image concurrently
     resolved_title = summary_data.get("title", title) if summary_data else title
-    image_url = _fetch_best_image(resolved_title, is_brand, is_public_figure, summary_data)
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        future_extract = executor.submit(_fetch_article_sections, title)
+        future_image = executor.submit(
+            _fetch_best_image, resolved_title, is_brand, is_public_figure, summary_data
+        )
+        extract = future_extract.result()
+        image_url = future_image.result()
+
+    return {
+        "title": resolved_title,
+        "text": extract,
+        "image_url": image_url,
+    }
+
+
+def get_entity_text_by_title(
+    title: str, expected_type: Optional[str] = None
+) -> Dict[str, Optional[str]]:
+    """Fetch Wikipedia content for a *resolved* article title.
+
+    Unlike ``get_entity_text`` this skips disambiguation/search logic and
+    goes straight to fetching the article.  Used after the user picks a
+    candidate from the disambiguation picker.
+    """
+    if not title or not title.strip():
+        raise ValueError("title must be a non-empty string.")
+
+    title = title.strip()
+    is_brand = expected_type == "organization"
+    is_public_figure = expected_type == "person"
+
+    encoded_title = urllib.parse.quote(title)
+    url = WIKIPEDIA_SUMMARY_URL.format(title=encoded_title)
+    resp = _session.get(url, headers=_build_headers(), timeout=10)
+    summary_data = resp.json() if resp.status_code == 200 else None
+
+    # Fetch article text and image concurrently
+    resolved_title = summary_data.get("title", title) if summary_data else title
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        future_extract = executor.submit(_fetch_article_sections, title)
+        future_image = executor.submit(
+            _fetch_best_image, resolved_title, is_brand, is_public_figure, summary_data
+        )
+        extract = future_extract.result()
+        image_url = future_image.result()
 
     return {
         "title": resolved_title,
