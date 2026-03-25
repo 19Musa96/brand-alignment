@@ -1,6 +1,7 @@
 """Generate concise alignment explanations for two entities."""
 
 import os
+import threading
 from typing import List
 
 from google import genai
@@ -10,20 +11,24 @@ from services.retry import gemini_retry
 _MODEL_NAME = "gemini-2.5-flash-lite"
 _configured: bool = False
 _client: genai.Client | None = None
+_client_lock = threading.Lock()
 
 
 def _configure_client() -> None:
-    """Configure the client once using the API key from the environment."""
+    """Configure the client once using the API key from the environment. Thread-safe."""
     global _configured, _client
     if _configured:
         return
-    api_key = os.getenv("GEMINI_API_KEY")
-    if not api_key:
-        raise RuntimeError(
-            "GEMINI_API_KEY environment variable is required for explanations."
-        )
-    _client = genai.Client(api_key=api_key)
-    _configured = True
+    with _client_lock:
+        if _configured:
+            return
+        api_key = os.getenv("GEMINI_API_KEY")
+        if not api_key:
+            raise RuntimeError(
+                "GEMINI_API_KEY environment variable is required for explanations."
+            )
+        _client = genai.Client(api_key=api_key)
+        _configured = True
 
 
 @gemini_retry
