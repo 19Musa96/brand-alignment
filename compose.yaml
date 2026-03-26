@@ -9,6 +9,10 @@
 # https://github.com/docker/awesome-compose
 services:
   server:
+    environment:
+      - GOOGLE_APPLICATION_CREDENTIALS=/tmp/keys/key.json
+    volumes:
+      - ./key.json:/tmp/keys/key.json:ro
     build:
       context: .
     ports:

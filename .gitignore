@@ -62,9 +62,10 @@ desktop.ini
 .streamlit/
 
 #scripts for deploying to gcloud run
-*.sh
+useful-scripts
 
 .automaker
 node_modules
 test-results
+#gcloud credentials
 key.json
