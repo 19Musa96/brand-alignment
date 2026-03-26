@@ -428,30 +428,85 @@ def _prepare_axes(entity_a: dict, entity_b: dict, weights: dict):
     return axis_pairs, unique_texts
 
 
-def compute_final_alignment_score(text_a: str, text_b: str) -> float:
+def _try_precomputed(entity_name: str) -> dict | None:
+    """Look up pre-computed identity signals and embeddings for an entity.
+
+    If found, loads the profile and pre-populates the in-memory embedding
+    cache so subsequent ``_embed_text`` calls hit the cache instantly.
+
+    Returns the identity signals dict or ``None`` if not in the database.
+    """
+    try:
+        from services.entity_db import lookup_entity, init_db
+        init_db()
+        record = lookup_entity(entity_name)
+    except Exception:
+        return None
+
+    if record is None:
+        return None
+
+    # Pre-populate the in-memory embedding cache with stored vectors.
+    with _embed_cache_lock:
+        for axis, text_value in record["axis_texts"].items():
+            if text_value not in _embed_cache:
+                _embed_cache[text_value] = record["embeddings"][axis]
+
+    print(f"[precomputed] Using pre-computed profile for '{entity_name}' "
+          f"({len(record['embeddings'])} axes cached)")
+    return record["profile"]
+
+
+def compute_final_alignment_score(text_a: str, text_b: str,
+                                  precomputed_a: dict | None = None,
+                                  precomputed_b: dict | None = None) -> float:
     """
     Compute a final alignment score by combining domain and value scores with weights.
     Non-linear normalization is applied per the scoring config files.
 
+    When ``precomputed_a`` or ``precomputed_b`` are provided (pre-computed
+    identity signal dicts from the entity database), the corresponding
+    identity extraction and embedding API calls are skipped entirely.
+
     Optimized pipeline:
-    1. Identity extraction (2 LLM calls, concurrent)
-    2. Batch embed ALL axis texts (1 API call)
+    1. Identity extraction (2 LLM calls, concurrent) — skipped for pre-computed entities
+    2. Batch embed ALL axis texts (1 API call) — skipped for pre-computed entities
     3. ALL LLM judge calls across both categories (9 calls, all concurrent)
     4. Compute scores locally (pure math, instant)
     """
-    # Step 1: Extract identity signals for both entities concurrently
-    with ThreadPoolExecutor(max_workers=2) as executor:
-        future_a = executor.submit(extract_identity_signals, text_a)
-        future_b = executor.submit(extract_identity_signals, text_b)
-        entity_a = future_a.result()
-        entity_b = future_b.result()
+    # Step 1: Extract identity signals — use pre-computed profiles when available
+    entity_a = precomputed_a
+    entity_b = precomputed_b
+    need_extract = []
+    if entity_a is None:
+        need_extract.append(("a", text_a))
+    if entity_b is None:
+        need_extract.append(("b", text_b))
+
+    if len(need_extract) == 2:
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            future_a = executor.submit(extract_identity_signals, text_a)
+            future_b = executor.submit(extract_identity_signals, text_b)
+            entity_a = future_a.result()
+            entity_b = future_b.result()
+    elif len(need_extract) == 1:
+        label, text = need_extract[0]
+        result = extract_identity_signals(text)
+        if label == "a":
+            entity_a = result
+        else:
+            entity_b = result
 
     # Step 2: Prepare all axis data and batch embed ALL texts in one API call
     domain_pairs, domain_texts = _prepare_axes(entity_a, entity_b, DOMAIN_RELATEDNESS_WEIGHTS)
     value_pairs, value_texts = _prepare_axes(entity_a, entity_b, VALUE_ALIGNMENT_WEIGHTS)
     all_unique_texts = list(domain_texts | value_texts)
-    if all_unique_texts:
-        _embed_batch(all_unique_texts)  # Single API call, pre-populates cache
+
+    # Filter out texts already in the embedding cache (pre-computed entities)
+    with _embed_cache_lock:
+        uncached_texts = [t for t in all_unique_texts if t not in _embed_cache]
+    if uncached_texts:
+        _embed_batch(uncached_texts)  # Single API call, pre-populates cache
 
     # Step 3: Fire ALL LLM judge calls across both categories concurrently
     domain_llm_config = DOMAIN_LLM_JUDGE_CONFIG or {}

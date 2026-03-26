@@ -3,13 +3,14 @@ from concurrent.futures import ThreadPoolExecutor
 import streamlit as st
 from dotenv import load_dotenv
 
-from services.embedding_service import compute_final_alignment_score
+from services.embedding_service import compute_final_alignment_score, _try_precomputed
 from services.explanation_service import generate_alignment_explanation
 from services.wikipedia_service import (
     get_entity_text,
     get_entity_text_by_title,
     DisambiguationError,
 )
+from services.auto_ingest import process_pending_ingests
 from utils.scoring_utils import relationship_label
 from utils.styles import get_app_styles
 from utils.ui_utils import (
@@ -83,6 +84,9 @@ def _run_analysis(entity_a, entity_b, resolved_a=None, resolved_b=None):
 
     Stores results in session-state cache and records the cache key so the
     results can be re-displayed after a Streamlit rerun.
+
+    After successful analysis, automatically ingests entities that were not
+    found in the pre-computed database.
     """
     # Check session-state cache for repeated queries
     cache_key = (entity_a, entity_b, resolved_a, resolved_b)
@@ -91,6 +95,13 @@ def _run_analysis(entity_a, entity_b, resolved_a=None, resolved_b=None):
     cached = st.session_state.analysis_cache.get(cache_key)
 
     if not cached:
+        # Check for pre-computed identity profiles in the entity database.
+        # The lookup name is the resolved title if available, otherwise the input name.
+        lookup_a = resolved_a or entity_a
+        lookup_b = resolved_b or entity_b
+        precomputed_a = _try_precomputed(lookup_a)
+        precomputed_b = _try_precomputed(lookup_b)
+
         with st.spinner("Fetching and processing Wikipedia content..."):
             # Fetch both entities concurrently
             with ThreadPoolExecutor(max_workers=2) as executor:
@@ -104,9 +115,13 @@ def _run_analysis(entity_a, entity_b, resolved_a=None, resolved_b=None):
         text_b = entity_b_data["text"]
 
         with st.spinner("Analyzing alignment..."):
-            # Run scoring and explanation generation concurrently
+            # Run scoring and explanation generation concurrently.
+            # Pass pre-computed profiles to skip identity extraction + embedding for indexed entities.
             with ThreadPoolExecutor(max_workers=2) as executor:
-                future_scores = executor.submit(compute_final_alignment_score, text_a, text_b)
+                future_scores = executor.submit(
+                    compute_final_alignment_score, text_a, text_b,
+                    precomputed_a=precomputed_a, precomputed_b=precomputed_b,
+                )
                 future_bullets = executor.submit(generate_alignment_explanation, text_a, text_b)
                 domain_score, value_score, domain_score_dict, value_score_dict, identity_a, identity_b = future_scores.result()
                 bullets = future_bullets.result()
@@ -125,6 +140,24 @@ def _run_analysis(entity_a, entity_b, resolved_a=None, resolved_b=None):
             "display_entity_a": entity_a,
             "display_entity_b": entity_b,
         }
+
+        # Queue entities for background auto-ingestion if they were not precomputed
+        pending_ingest = []
+        if precomputed_a is None:
+            pending_ingest.append({
+                "name": lookup_a,
+                "type": "person",
+                "identity_profile": identity_a,
+            })
+        if precomputed_b is None:
+            pending_ingest.append({
+                "name": lookup_b,
+                "type": "organization",
+                "identity_profile": identity_b,
+            })
+
+        if pending_ingest:
+            process_pending_ingests(pending_ingest)
 
     # Remember which analysis to display (survives rerun)
     st.session_state.last_analysis_key = cache_key
@@ -266,6 +299,7 @@ if st.session_state.get("disambig_confirmed"):
             resolved_b=confirmed["resolved_b"],
         )
         st.session_state.disambig = None
+        st.session_state.disambig_displayed = True  # Mark that we will display results
         _display_results(st.session_state.last_analysis_key)
     except DisambiguationError as exc:
         # The other entity is also ambiguous — show a new picker
@@ -289,10 +323,15 @@ if (
     not analyze
     and st.session_state.disambig is None
     and not st.session_state.get("disambig_confirmed")
+    and not st.session_state.get("disambig_displayed")
     and st.session_state.get("last_analysis_key") is not None
     and st.session_state.get("analysis_cache", {}).get(st.session_state.last_analysis_key)
 ):
     _display_results(st.session_state.last_analysis_key)
+
+# Clear the display flag after use
+if st.session_state.get("disambig_displayed"):
+    st.session_state.disambig_displayed = False
 
 # ── Methodology section ──
 st.markdown('<div class="methodology-section"></div>', unsafe_allow_html=True)
