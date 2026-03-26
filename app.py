@@ -10,6 +10,7 @@ from services.wikipedia_service import (
     get_entity_text_by_title,
     DisambiguationError,
 )
+from services.auto_ingest import process_pending_ingests
 from utils.scoring_utils import relationship_label
 from utils.styles import get_app_styles
 from utils.ui_utils import (
@@ -83,6 +84,9 @@ def _run_analysis(entity_a, entity_b, resolved_a=None, resolved_b=None):
 
     Stores results in session-state cache and records the cache key so the
     results can be re-displayed after a Streamlit rerun.
+
+    After successful analysis, automatically ingests entities that were not
+    found in the pre-computed database.
     """
     # Check session-state cache for repeated queries
     cache_key = (entity_a, entity_b, resolved_a, resolved_b)
@@ -136,6 +140,24 @@ def _run_analysis(entity_a, entity_b, resolved_a=None, resolved_b=None):
             "display_entity_a": entity_a,
             "display_entity_b": entity_b,
         }
+
+        # Queue entities for background auto-ingestion if they were not precomputed
+        pending_ingest = []
+        if precomputed_a is None:
+            pending_ingest.append({
+                "name": lookup_a,
+                "type": "person",
+                "identity_profile": identity_a,
+            })
+        if precomputed_b is None:
+            pending_ingest.append({
+                "name": lookup_b,
+                "type": "organization",
+                "identity_profile": identity_b,
+            })
+
+        if pending_ingest:
+            process_pending_ingests(pending_ingest)
 
     # Remember which analysis to display (survives rerun)
     st.session_state.last_analysis_key = cache_key
